@@ -396,6 +396,7 @@ img{display:block;max-width:100%}
         <b id="procTitle">Сурет жүктелуде...</b>
         <span id="procSub">AI серверіне жіберілуде</span>
         <div class="proc-bar"><i id="procBar"></i></div>
+        <div id="procErrorDetails" style="display:none;margin-top:9px;font-size:11px;color:#e5484d;background:rgba(229,72,77,0.1);padding:8px 10px;border-radius:10px;word-break:break-word;text-align:left;max-height:140px;overflow-y:auto;font-family:monospace;line-height:1.4;"></div>
       </div>
     </div>
 
@@ -656,6 +657,10 @@ function resetProcessingUI(){
   const st=$('statusMark'); st.className='status';
   $('procBar').style.width='0%';
   $('ctaBtn').disabled=false;
+  if($('procErrorDetails')){
+    $('procErrorDetails').style.display='none';
+    $('procErrorDetails').textContent='';
+  }
 }
 
 window.startEnhance = async ()=>{
@@ -667,6 +672,11 @@ window.startEnhance = async ()=>{
   $('previewFrame').classList.add('processing');
   $('scanline').classList.add('on');
   haptic('medium');
+
+  if($('procErrorDetails')){
+    $('procErrorDetails').style.display='none';
+    $('procErrorDetails').textContent='';
+  }
 
   // Step 1: Uploading
   st.classList.add('spin');
@@ -704,13 +714,26 @@ window.startEnhance = async ()=>{
     clearInterval(progressTimer);
 
     if(!resp.ok){
-      const errData = await resp.json().catch(()=>({error:'Сервер қатесі'}));
-      throw new Error(errData.error || 'Өңдеу сәтсіз аяқталды');
+      let errDetails = '';
+      try {
+        const errJson = await resp.json();
+        errDetails = errJson.details || errJson.error || errJson.detail || JSON.stringify(errJson);
+        if(errJson.traceback) {
+          errDetails += `\nTraceback:\n${errJson.traceback.slice(0, 300)}...`;
+        }
+      } catch(e) {
+        const rawText = await resp.text().catch(()=>'');
+        errDetails = rawText.slice(0, 300) || `HTTP ${resp.status} ${resp.statusText}`;
+      }
+      throw new Error(`[HTTP ${resp.status}] ${errDetails}`);
     }
 
     const data = await resp.json();
     if(!data.success){
-      throw new Error(data.error || 'Қате пайда болды');
+      let errDetails = data.error || 'Қате пайда болды';
+      if(data.details) errDetails += `\n${data.details}`;
+      if(data.traceback) errDetails += `\nTraceback:\n${data.traceback.slice(0, 300)}...`;
+      throw new Error(errDetails);
     }
 
     // Step 3: Done
@@ -734,11 +757,15 @@ window.startEnhance = async ()=>{
   } catch(err) {
     clearInterval(progressTimer);
     st.classList.remove('spin'); st.classList.add('err');
-    $('procTitle').textContent='Қате пайда болды';
-    $('procSub').textContent=err.message || 'Қайта көріңіз';
+    $('procTitle').textContent='Қате орын алды!';
+    $('procSub').textContent='Қате туралы толық лог:';
+    if($('procErrorDetails')){
+      $('procErrorDetails').style.display='block';
+      $('procErrorDetails').textContent=err.message || String(err);
+    }
     cta.disabled=false;
     haptic('error');
-    showToast(err.message || 'Қате орын алды');
+    showToast(err.message ? err.message.slice(0, 45) : 'Қате');
   }
 };
 
