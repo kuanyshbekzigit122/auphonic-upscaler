@@ -32,7 +32,7 @@ def setup(vercel_url: str):
     res3 = requests.get(f"{base_tg}/getMe", timeout=10).json()
     print("Bot info:", res3)
     
-    print("\n✅ ҚҰТТЫҚТАЙМЫН! БОТ ЖӘНЕ MINI APP ТОЛЫҚ ҚОСЫЛДЫ!")
+    print("\n[SUCCESS] TELEGRAM BOT AND MINI APP SUCCESSFULLY CONNECTED!")
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
