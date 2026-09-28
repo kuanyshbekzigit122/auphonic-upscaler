@@ -21,7 +21,7 @@ logger = logging.getLogger("vercel_app")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8230786310:AAGjsDxHl2H3mXFr66SnZqfRc7yjBwI44QY")
 VERCEL_URL = os.getenv("VERCEL_PROJECT_PRODUCTION_URL", os.getenv("VERCEL_URL", ""))
 
-app = FastAPI(title="Auphonic AI Upscaler - Vercel Serverless Edition")
+app = FastAPI(title="Auphonic AI Upscaler - Vercel Serverless Edition", redirect_slashes=False)
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,6 +30,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def path_normalizer_middleware(request: Request, call_next):
+    path = request.scope.get("path", "")
+    for prefix in ("/api/index.py", "/api/index"):
+        if path.startswith(prefix):
+            new_path = path[len(prefix):]
+            request.scope["path"] = new_path if new_path else "/"
+            break
+    return await call_next(request)
+
 
 # ----------------- Real-ESRGAN Engine -----------------
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -127,7 +138,11 @@ def upscale_image(img: Image.Image, scale: int = 4) -> Image.Image:
 
 
 # ----------------- Web Endpoints -----------------
+@app.get("/")
+@app.get("/health")
+@app.get("/health/")
 @app.get("/api/health")
+@app.get("/api/health/")
 async def health():
     return {
         "status": "online",
@@ -135,7 +150,10 @@ async def health():
         "platform": "Vercel Serverless"
     }
 
+@app.post("/webhook")
+@app.post("/webhook/")
 @app.post("/api/webhook")
+@app.post("/api/webhook/")
 async def telegram_webhook(request: Request):
     """
     Serverless Telegram Bot Webhook.
@@ -323,7 +341,10 @@ async def telegram_webhook(request: Request):
     return {"ok": True}
 
 
+@app.post("/upscale")
+@app.post("/upscale/")
 @app.post("/api/upscale")
+@app.post("/api/upscale/")
 async def upscale_api(
     file: UploadFile = File(...),
     scale: str = Form("4"),
@@ -382,7 +403,10 @@ async def upscale_api(
         )
 
 
+@app.post("/send-to-chat")
+@app.post("/send-to-chat/")
 @app.post("/api/send-to-chat")
+@app.post("/api/send-to-chat/")
 async def send_to_chat(request: Request):
     """
     Sends the upscaled photo from Mini App directly into the Telegram user's private chat.
