@@ -34,6 +34,130 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def get_webapp_url(request: Request) -> str:
+    url = f"https://{VERCEL_URL}" if not VERCEL_URL.startswith("http") else VERCEL_URL
+    req_host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+    if req_host:
+        url = f"https://{req_host}"
+    return url
+
+# ================= MINIMALIST UI SCREENS =================
+
+def get_main_screen(first_name: str, webapp_url: str):
+    name_str = f", {first_name}" if first_name else ""
+    text = (
+        f"<b>Auphonic - AI Upscaler Pro</b>\n\n"
+        f"Сәлем{name_str}! Мен суреттер мен бейнелердің сапасын AI арқылы жақсартамын.\n\n"
+        f"<blockquote>📷 <b>Сурет жіберіңіз</b> — 2× немесе 4× үлкейтемін\n"
+        f"🎥 <b>Бейне жіберіңіз</b> — кадр бойынша өңдеп беремін</blockquote>"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "📱 Mini App ашу", "web_app": {"url": webapp_url}}],
+            [
+                {"text": "🚀 Жұмысты бастау", "callback_data": "nav:work"},
+                {"text": "💡 Анықтама", "callback_data": "nav:help"}
+            ]
+        ]
+    }
+    return text, keyboard
+
+def get_help_screen(webapp_url: str):
+    text = (
+        "<b>Auphonic - AI Upscaler Pro</b>\n\n"
+        "💡 <b>Қалай қолдану керек:</b>\n\n"
+        "<blockquote>1. Маған кез келген сурет немесе қысқа бейне жіберіңіз.\n"
+        "2. Сапасын (2× немесе 4×) және түрін таңдаңыз.\n"
+        "3. «Өңдеуді бастау» батырмасын басыңыз.\n"
+        "4. Нәтиже дайын болғанда бірден жүктеп алыңыз.\n\n"
+        "⚙️ <b>Шектеулер:</b>\n"
+        "• Сурет көлемі: 20 МБ дейін\n"
+        "• Бейне ұзақтығы: 60 секундқа дейін\n"
+        "• Форматтар: JPG, PNG, WEBP, MP4, MOV</blockquote>"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "🚀 Жұмысты бастау", "callback_data": "nav:work"},
+                {"text": "⬅️ Артқа", "callback_data": "nav:main"}
+            ]
+        ]
+    }
+    return text, keyboard
+
+def get_work_screen(webapp_url: str):
+    text = (
+        "<b>Auphonic - AI Upscaler Pro</b>\n\n"
+        "🚀 <b>Сапаны арттыруға дайынсыз ба?</b>\n\n"
+        "<blockquote>📷 <b>Суретті</b> (JPG, PNG, WEBP) немесе 🎥 <b>бейнені</b> (MP4, MOV) осы чатқа тікелей жіберіңіз!\n\n"
+        "Файлды қабылдаған бойда бот сапаны <b>2×</b> немесе <b>4×</b> есе көтеру баптауларын ұсынады.</blockquote>"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "📱 Mini App ашу", "web_app": {"url": webapp_url}}],
+            [{"text": "⬅️ Артқа", "callback_data": "nav:main"}]
+        ]
+    }
+    return text, keyboard
+
+# ================= INLINE WIZARD SCREENS =================
+
+def get_wizard_step1(file_id: str):
+    text = (
+        "<b>Auphonic - AI Upscaler Pro</b>\n"
+        "Қадам 1 / 2\n\n"
+        "<b>Суретті қанша есе үлкейткіңіз келеді?</b>\n"
+        "Масштаб пен сапаны таңдаңыз:"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "✨ 2× Үлкейту", "callback_data": f"w:s1:2:{file_id}"},
+                {"text": "🚀 4× Ультра", "callback_data": f"w:s1:4:{file_id}"}
+            ]
+        ]
+    }
+    return text, keyboard
+
+def get_wizard_step2(scale: str, file_id: str):
+    text = (
+        "<b>Auphonic - AI Upscaler Pro</b>\n"
+        "Қадам 2 / 2\n\n"
+        "<b>Суреттің түрі қандай?</b>\n"
+        f"Таңдалған: <b>{scale}× масштаб</b>\n\n"
+        "AI сурет түріне қарай бейімделеді:"
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "📸 Фотосурет", "callback_data": f"w:s2:{scale}:photo:{file_id}"},
+                {"text": "🎨 Арт / Аниме", "callback_data": f"w:s2:{scale}:anime:{file_id}"}
+            ],
+            [
+                {"text": "⬅️ Артқа", "callback_data": f"w:back:1:{file_id}"}
+            ]
+        ]
+    }
+    return text, keyboard
+
+def get_wizard_confirm(scale: str, mode: str, file_id: str):
+    mode_label = "Фотосурет" if mode == "photo" else "Арт / Аниме"
+    text = (
+        "<b>Auphonic - AI Upscaler Pro</b>\n"
+        "Барлығы дайын! ✨\n\n"
+        "<b>Өңдеуді бастаймыз ба?</b>\n"
+        f"Таңдалған: <b>{scale}×</b> • <b>{mode_label}</b>\n\n"
+        "AI сапаны арттыруға толық дайын."
+    )
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "🚀 Өңдеуді бастау", "callback_data": f"w:run:{scale}:{mode}:{file_id}"}],
+            [{"text": "⬅️ Артқа", "callback_data": f"w:back:2:{scale}:{file_id}"}]
+        ]
+    }
+    return text, keyboard
+
+
 @app.api_route("/", methods=["GET", "POST", "OPTIONS"])
 @app.api_route("/webhook", methods=["GET", "POST", "OPTIONS"])
 @app.api_route("/api/webhook", methods=["GET", "POST", "OPTIONS"])
@@ -48,68 +172,185 @@ async def telegram_webhook_handler(request: Request):
         return {"ok": True}
 
     base_tg_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+    webapp_url = get_webapp_url(request)
 
-    webapp_url = f"https://{VERCEL_URL}" if not VERCEL_URL.startswith("http") else VERCEL_URL
-    req_host = request.headers.get("x-forwarded-host") or request.headers.get("host")
-    if req_host:
-        webapp_url = f"https://{req_host}"
-
-    # Handle Callback Queries
+    # ------------------ CALLBACK QUERIES (In-Place Edit) ------------------
     if "callback_query" in update:
         cq = update["callback_query"]
         cq_id = cq.get("id")
-        chat_id = cq.get("message", {}).get("chat", {}).get("id")
+        msg = cq.get("message", {})
+        chat_id = msg.get("chat", {}).get("id")
+        message_id = msg.get("message_id")
         data = cq.get("data", "")
+        from_user = cq.get("from", {})
+        first_name = from_user.get("first_name", "")
 
         requests.post(f"{base_tg_url}/answerCallbackQuery", json={"callback_query_id": cq_id}, timeout=5)
 
+        # 1. Navigation callbacks (main, help, work) -> EDIT IN-PLACE
         if data == "nav:help":
-            help_text = (
-                "<b>Auphonic - AI Upscaler Pro</b>\n\n"
-                "💡 <b>Қалай қолдану керек:</b>\n\n"
-                "1. Маған кез келген суретті осы чатқа тікелей жіберіңіз.\n"
-                "2. Бот оны автоматты түрде қабылдап, 4K сапада өңдеп береді.\n"
-                "3. Немесе заманауи интерактивті <b>Mini App</b>-ты қолданыңыз!\n\n"
-                "⚙️ <b>Шектеулер:</b>\n"
-                "• Сурет көлемі: 20 МБ дейін\n"
-                "• Форматтар: JPG, PNG, WEBP\n"
-                "• 100% Тегін және шектеусіз"
-            )
-            keyboard = {
-                "inline_keyboard": [
-                    [{"text": "📱 Mini App ашу", "web_app": {"url": webapp_url}}],
-                    [{"text": "⬅️ Артқа", "callback_data": "nav:main"}]
-                ]
-            }
-            requests.post(f"{base_tg_url}/sendMessage", json={
+            text, kb = get_help_screen(webapp_url)
+            requests.post(f"{base_tg_url}/editMessageText", json={
                 "chat_id": chat_id,
-                "text": help_text,
+                "message_id": message_id,
+                "text": text,
                 "parse_mode": "HTML",
-                "reply_markup": keyboard
+                "reply_markup": kb
             }, timeout=10)
 
-        elif data in ("nav:work", "nav:main"):
-            welcome_text = (
-                "✨ <b>Auphonic - AI Upscaler Pro</b> ботына қош келдіңіз!\n\n"
-                "Мен суреттердің сапасын жасанды интеллект (<b>Real-ESRGAN 4K</b>) арқылы жоғары деңгейге көтеремін.\n\n"
-                "📷 <b>Сурет жіберіңіз</b> (JPG, PNG, WEBP) — осы чатқа тікелей жіберсеңіз, сапасын 4K-ға дейін арттырамын.\n\n"
-                "<i>Төмендегі батырмалар арқылы қажетті бөлімді таңдаңыз:</i>"
-            )
-            keyboard = {
-                "inline_keyboard": [
-                    [{"text": "📱 Mini App ашу", "web_app": {"url": webapp_url}}],
-                    [
-                        {"text": "🚀 Жұмысты бастау", "callback_data": "nav:work"},
-                        {"text": "💡 Анықтама", "callback_data": "nav:help"}
-                    ]
-                ]
-            }
-            requests.post(f"{base_tg_url}/sendMessage", json={
+        elif data == "nav:work":
+            text, kb = get_work_screen(webapp_url)
+            requests.post(f"{base_tg_url}/editMessageText", json={
                 "chat_id": chat_id,
-                "text": welcome_text,
+                "message_id": message_id,
+                "text": text,
                 "parse_mode": "HTML",
-                "reply_markup": keyboard
+                "reply_markup": kb
             }, timeout=10)
+
+        elif data == "nav:main":
+            text, kb = get_main_screen(first_name, webapp_url)
+            requests.post(f"{base_tg_url}/editMessageText", json={
+                "chat_id": chat_id,
+                "message_id": message_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "reply_markup": kb
+            }, timeout=10)
+
+        # 2. Wizard callbacks -> EDIT IN-PLACE
+        elif data.startswith("w:s1:"):
+            # w:s1:scale:file_id
+            parts = data.split(":")
+            scale = parts[2]
+            file_id = parts[3]
+            text, kb = get_wizard_step2(scale, file_id)
+            requests.post(f"{base_tg_url}/editMessageText", json={
+                "chat_id": chat_id,
+                "message_id": message_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "reply_markup": kb
+            }, timeout=10)
+
+        elif data.startswith("w:s2:"):
+            # w:s2:scale:mode:file_id
+            parts = data.split(":")
+            scale = parts[2]
+            mode = parts[3]
+            file_id = parts[4]
+            text, kb = get_wizard_confirm(scale, mode, file_id)
+            requests.post(f"{base_tg_url}/editMessageText", json={
+                "chat_id": chat_id,
+                "message_id": message_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "reply_markup": kb
+            }, timeout=10)
+
+        elif data.startswith("w:back:1:"):
+            parts = data.split(":")
+            file_id = parts[3]
+            text, kb = get_wizard_step1(file_id)
+            requests.post(f"{base_tg_url}/editMessageText", json={
+                "chat_id": chat_id,
+                "message_id": message_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "reply_markup": kb
+            }, timeout=10)
+
+        elif data.startswith("w:back:2:"):
+            parts = data.split(":")
+            scale = parts[3]
+            file_id = parts[4]
+            text, kb = get_wizard_step2(scale, file_id)
+            requests.post(f"{base_tg_url}/editMessageText", json={
+                "chat_id": chat_id,
+                "message_id": message_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "reply_markup": kb
+            }, timeout=10)
+
+        elif data.startswith("w:run:"):
+            # w:run:scale:mode:file_id
+            parts = data.split(":")
+            scale_val = int(parts[2]) if parts[2].isdigit() else 4
+            file_id = parts[4]
+
+            # Edit to live processing status
+            requests.post(f"{base_tg_url}/editMessageText", json={
+                "chat_id": chat_id,
+                "message_id": message_id,
+                "text": "⏳ <b>AI 4K Real-ESRGAN арқылы өңдеуде...</b>",
+                "parse_mode": "HTML"
+            }, timeout=10)
+
+            # Run upscale in background
+            try:
+                file_info = requests.get(f"{base_tg_url}/getFile?file_id={file_id}", timeout=10).json()
+                if not file_info.get("ok"):
+                    raise RuntimeError(file_info.get("description", "Telegram getFile error"))
+
+                file_path = file_info["result"]["file_path"]
+                download_url = f"https://api.telegram.org/file/bot{TELEGRAM_BOT_TOKEN}/{file_path}"
+                img_data = requests.get(download_url, timeout=30).content
+
+                pil_img = Image.open(io.BytesIO(img_data))
+                orig_w, orig_h = pil_img.size
+
+                t0 = time.time()
+                up_img = upscale_image(pil_img, scale=scale_val)
+                elapsed = round(time.time() - t0, 2)
+
+                buf = io.BytesIO()
+                up_img.save(buf, format="PNG", optimize=True)
+                buf.seek(0)
+
+                # Send lossless uncompressed document
+                caption = (
+                    f"✨ <b>Дайын!</b> ({elapsed} сек)\n"
+                    f"📐 <b>Көлемі:</b> {orig_w}×{orig_h} ➔ <b>{up_img.size[0]}×{up_img.size[1]} px</b>"
+                )
+                kb = {
+                    "inline_keyboard": [
+                        [{"text": "📱 Mini App ашу", "web_app": {"url": webapp_url}}]
+                    ]
+                }
+                requests.post(
+                    f"{base_tg_url}/sendDocument",
+                    data={
+                        "chat_id": chat_id,
+                        "caption": caption,
+                        "parse_mode": "HTML",
+                        "reply_markup": str(kb).replace("'", '"')
+                    },
+                    files={"document": ("auphonic_4k_upscaled.png", buf, "image/png")},
+                    timeout=60
+                )
+
+                # Remove the processing card
+                requests.post(f"{base_tg_url}/deleteMessage", json={
+                    "chat_id": chat_id,
+                    "message_id": message_id
+                }, timeout=10)
+
+            except Exception as exc:
+                tb = traceback.format_exc()
+                logger.error("Error processing wizard photo: %s\n%s", exc, tb)
+                err_report = (
+                    f"⚠️ <b>Суретті өңдеу кезінде қате орын алды!</b>\n\n"
+                    f"<b>Қате түрі:</b> <code>{type(exc).__name__}</code>\n"
+                    f"<b>Себебі:</b> <code>{str(exc)}</code>\n\n"
+                    f"<b>Толық лог (traceback):</b>\n<code>{tb[:250]}...</code>"
+                )
+                requests.post(f"{base_tg_url}/editMessageText", json={
+                    "chat_id": chat_id,
+                    "message_id": message_id,
+                    "text": err_report,
+                    "parse_mode": "HTML"
+                }, timeout=10)
 
         return {"ok": True}
 
@@ -119,36 +360,24 @@ async def telegram_webhook_handler(request: Request):
     msg = update["message"]
     chat_id = msg.get("chat", {}).get("id")
     text = msg.get("text", "")
+    from_user = msg.get("from", {})
+    first_name = from_user.get("first_name", "")
 
     if not chat_id:
         return {"ok": True}
 
-    # /start or /help
+    # ------------------ /start COMMAND ------------------
     if text.startswith("/start") or text.startswith("/help"):
-        welcome_text = (
-            "✨ <b>Auphonic - AI Upscaler Pro</b> ботына қош келдіңіз!\n\n"
-            "Мен суреттердің сапасын жасанды интеллект (<b>Real-ESRGAN 4K</b>) арқылы жоғары деңгейге көтеремін.\n\n"
-            "📷 <b>Сурет жіберіңіз</b> (JPG, PNG, WEBP) — осы чатқа тікелей жіберсеңіз, сапасын 4K-ға дейін арттырамын.\n\n"
-            "<i>Төмендегі батырмалар арқылы қажетті бөлімді таңдаңыз:</i>"
-        )
-        keyboard = {
-            "inline_keyboard": [
-                [{"text": "📱 Mini App ашу", "web_app": {"url": webapp_url}}],
-                [
-                    {"text": "🚀 Жұмысты бастау", "callback_data": "nav:work"},
-                    {"text": "💡 Анықтама", "callback_data": "nav:help"}
-                ]
-            ]
-        }
+        welcome_text, kb = get_main_screen(first_name, webapp_url)
         requests.post(f"{base_tg_url}/sendMessage", json={
             "chat_id": chat_id,
             "text": welcome_text,
             "parse_mode": "HTML",
-            "reply_markup": keyboard
+            "reply_markup": kb
         }, timeout=10)
         return {"ok": True}
 
-    # Direct photo or image document upload
+    # ------------------ PHOTO UPLOAD (Wizard Launch) ------------------
     file_id = None
     if "photo" in msg and len(msg["photo"]) > 0:
         file_id = msg["photo"][-1]["file_id"]
@@ -156,65 +385,13 @@ async def telegram_webhook_handler(request: Request):
         file_id = msg["document"]["file_id"]
 
     if file_id:
-        proc_msg_id = None
-        try:
-            status_res = requests.post(f"{base_tg_url}/sendMessage", json={
-                "chat_id": chat_id,
-                "text": "⏳ <b>Сурет қабылданды!</b> AI 4K Real-ESRGAN арқылы сапасын арттыруда...",
-                "parse_mode": "HTML"
-            }, timeout=10).json()
-            proc_msg_id = status_res.get("result", {}).get("message_id")
-
-            file_info = requests.get(f"{base_tg_url}/getFile?file_id={file_id}", timeout=10).json()
-            if not file_info.get("ok"):
-                raise RuntimeError(f"Telegram getFile error: {file_info.get('description', 'Unknown error')}")
-
-            file_path = file_info["result"]["file_path"]
-            download_url = f"https://api.telegram.org/file/bot{TELEGRAM_BOT_TOKEN}/{file_path}"
-            img_data = requests.get(download_url, timeout=30).content
-
-            pil_img = Image.open(io.BytesIO(img_data))
-            orig_w, orig_h = pil_img.size
-
-            t0 = time.time()
-            up_img = upscale_image(pil_img, scale=4)
-            elapsed = round(time.time() - t0, 2)
-
-            buf = io.BytesIO()
-            up_img.save(buf, format="PNG", optimize=True)
-            buf.seek(0)
-
-            requests.post(
-                f"{base_tg_url}/sendDocument",
-                data={
-                    "chat_id": chat_id,
-                    "caption": f"✨ <b>4K Real-ESRGAN</b> сапасы арттырылды! ({elapsed} сек)\n📐 <b>Көлемі:</b> {orig_w}×{orig_h} ➔ <b>{up_img.size[0]}×{up_img.size[1]} px</b>",
-                    "parse_mode": "HTML"
-                },
-                files={"document": ("auphonic_4k_upscaled.png", buf, "image/png")},
-                timeout=60
-            )
-
-            if proc_msg_id:
-                requests.post(f"{base_tg_url}/deleteMessage", json={"chat_id": chat_id, "message_id": proc_msg_id}, timeout=10)
-
-        except Exception as exc:
-            tb = traceback.format_exc()
-            logger.error("Error processing photo webhook: %s\n%s", exc, tb)
-            err_report = (
-                f"⚠️ <b>Суретті өңдеу кезінде қате орын алды!</b>\n\n"
-                f"<b>Қате түрі:</b> <code>{type(exc).__name__}</code>\n"
-                f"<b>Себебі:</b> <code>{str(exc)}</code>\n\n"
-                f"<b>Толық лог (traceback):</b>\n<code>{tb[:300]}...</code>"
-            )
-            requests.post(
-                f"{base_tg_url}/sendMessage",
-                json={
-                    "chat_id": chat_id,
-                    "text": err_report,
-                    "parse_mode": "HTML"
-                },
-                timeout=10
-            )
+        w_text, w_kb = get_wizard_step1(file_id)
+        requests.post(f"{base_tg_url}/sendMessage", json={
+            "chat_id": chat_id,
+            "text": w_text,
+            "parse_mode": "HTML",
+            "reply_markup": w_kb,
+            "reply_to_message_id": msg.get("message_id")
+        }, timeout=10)
 
     return {"ok": True}
