@@ -51,6 +51,13 @@ def upscale_image(img: Image.Image, scale: int = 4) -> Image.Image:
     """High-speed 4K Real-ESRGAN super-resolution with smooth 2D tiling (0.6-2.5s)"""
     sess, inp_name, out_name = get_session()
 
+    # Cap maximum input dimension to true 4K target (1920px) to guarantee <2.5s execution
+    w_orig, h_orig = img.size
+    max_d = max(w_orig, h_orig)
+    if max_d > 1920:
+        ratio = 1920.0 / max_d
+        img = img.resize((int(w_orig * ratio), int(h_orig * ratio)), Image.Resampling.LANCZOS)
+
     has_alpha = img.mode in ("RGBA", "LA") or ("transparency" in img.info)
     if has_alpha:
         rgba = img.convert("RGBA")

@@ -34,6 +34,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+_processed_updates = set()
+_running_jobs = set()
+
 def get_webapp_url(request: Request) -> str:
     url = f"https://{VERCEL_URL}" if not VERCEL_URL.startswith("http") else VERCEL_URL
     req_host = request.headers.get("x-forwarded-host") or request.headers.get("host")
@@ -171,6 +174,15 @@ async def telegram_webhook_handler(request: Request):
         logger.error("Failed to parse Telegram update JSON: %s", parse_err)
         return {"ok": True}
 
+    update_id = update.get("update_id")
+    if update_id:
+        if update_id in _processed_updates:
+            logger.info("Ignoring duplicate update_id=%s", update_id)
+            return {"ok": True}
+        _processed_updates.add(update_id)
+        if len(_processed_updates) > 5000:
+            _processed_updates.clear()
+
     base_tg_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
     webapp_url = get_webapp_url(request)
 
@@ -279,15 +291,25 @@ async def telegram_webhook_handler(request: Request):
             scale_val = int(parts[2]) if parts[2].isdigit() else 4
             file_id = parts[4]
 
-            # Edit to live processing status
+            # Prevent Telegram retry duplicate executions
+            job_key = f"{chat_id}:{message_id}:{file_id}"
+            if job_key in _running_jobs:
+                logger.info("Job %s is already running/finished. Skipping duplicate.", job_key)
+                return {"ok": True}
+            _running_jobs.add(job_key)
+            if len(_running_jobs) > 1000:
+                _running_jobs.clear()
+
+            # Edit to live processing status AND remove keyboard to prevent double clicks
             requests.post(f"{base_tg_url}/editMessageText", json={
                 "chat_id": chat_id,
                 "message_id": message_id,
                 "text": "⏳ <b>AI 4K Real-ESRGAN арқылы өңдеуде...</b>",
-                "parse_mode": "HTML"
-            }, timeout=10)
+                "parse_mode": "HTML",
+                "reply_markup": {"inline_keyboard": []}
+            }, timeout=5)
 
-            # Run upscale in background
+            # Run upscale
             try:
                 file_info = requests.get(f"{base_tg_url}/getFile?file_id={file_id}", timeout=10).json()
                 if not file_info.get("ok"):
@@ -305,7 +327,8 @@ async def telegram_webhook_handler(request: Request):
                 elapsed = round(time.time() - t0, 2)
 
                 buf = io.BytesIO()
-                up_img.save(buf, format="PNG", optimize=True)
+                # Fast PNG encode (compress_level=1 is 30x faster than optimize=True, avoiding webhook timeout)
+                up_img.save(buf, format="PNG", compress_level=1)
                 buf.seek(0)
 
                 # Send lossless uncompressed document
@@ -385,6 +408,12 @@ async def telegram_webhook_handler(request: Request):
         file_id = msg["document"]["file_id"]
 
     if file_id:
+        photo_key = f"photo:{chat_id}:{file_id}"
+        if photo_key in _running_jobs:
+            logger.info("Photo %s already received. Skipping duplicate.", photo_key)
+            return {"ok": True}
+        _running_jobs.add(photo_key)
+
         w_text, w_kb = get_wizard_step1(file_id)
         requests.post(f"{base_tg_url}/sendMessage", json={
             "chat_id": chat_id,
